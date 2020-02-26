@@ -1,24 +1,25 @@
-const bcrypt = require('bcryptjs');
-
-const Users = require('../users/users-model.js');
+const jwt = require('jsonwebtoken');
+const { jwtSecret } = require('../config/secrets');
 
 module.exports = (req, res, next) => {
-  const { username, password } = req.headers;
+  // Checks if token is good
+  // (UNSPOKEN RULE) Token is normally sent in the authorization header
+  const token = req.headers.authorization; 
 
-  if (username && password) {
-    Users.findBy({ username })
-      .first()
-      .then(user => {
-        if (user && bcrypt.compareSync(password, user.password)) {
-          next();
-        } else {
-          res.status(401).json({ message: 'Invalid Credentials' });
-        }
-      })
-      .catch(error => {
-        res.status(500).json({ message: 'Ran into an unexpected error' });
-      });
+  if(token) {
+    // verify method expects a token (that is in the authorization)
+    // when SIGNING we needed to provide a secret. We also need a secret when VERIFYING. These two secrets must be the same
+    // A token you produce in development with a particular secret, if you try to check for the token in production and the secret is different it will fail
+    jwt.verify(token, jwtSecret, (err, decodedToken) => {
+      if(err) {
+        // There is a problem with the token, it is not valid
+        res.status(401).json({ message: 'Token is bad' })
+      } else {
+        req.decodedToken = decodedToken;
+        next();
+      }
+    })
   } else {
-    res.status(400).json({ message: 'No credentials provided' });
+    res.status(401).json({ message: 'You shall not pass' })
   }
 };
